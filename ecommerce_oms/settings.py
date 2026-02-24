@@ -33,6 +33,7 @@ INSTALLED_APPS = [
 
     # Third party apps
     'rest_framework',           # Django REST Framework for APIs
+    'drf_spectacular',          # Auto-generated API documentation
 
     # Our apps
     'returns',                  # Customer Returns module

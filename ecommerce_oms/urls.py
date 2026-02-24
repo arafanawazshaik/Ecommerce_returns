@@ -1,15 +1,16 @@
 """
-E-Commerce OMS URL Configuration
-
-URL Routing:
-    /admin/          → Django admin panel (for internal ops team)
-    /api/v1/returns/ → All return-related REST APIs
+E-Commerce Returns - URL Configuration
 """
 
 from django.contrib import admin
 from django.urls import path, include
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/returns/', include('returns.urls')),
+
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

@@ -300,31 +300,86 @@ def cancel_return(request, return_id):
 # CHECK ELIGIBILITY
 # ============================================================
 
-@api_view(['POST'])
-def check_eligibility(request):
+@api_view(['GET'])
+def list_returns(request):
     """
-    POST /api/v1/returns/check-eligibility/
+    GET /api/v1/returns/list/
 
-    Check if an order is eligible for return BEFORE creating the request.
-    This is called when customer clicks "Return" button in the app.
+    List return requests with filters and CURSOR-BASED pagination.
 
-    Request: {"order_id": 123}
-    Response: {"eligible": true, "return_window_days": 7, "days_remaining": 3, ...}
+    Why cursor-based instead of offset?
+    - Offset: "Give me page 5" → DB skips 80 rows (slow on large tables)
+    - Cursor: "Give me rows after ID 100" → DB uses index (fast always)
+    - At Flipkart scale (millions of returns), offset pagination degrades badly
+
+    Query params:
+    - customer_id: Filter by customer
+    - status: Filter by status
+    - is_flagged: Filter flagged returns (true/false)
+    - cursor: ID of last item from previous page (for next page)
+    - direction: 'next' (default) or 'prev'
+    - page_size: Items per page (default 20, max 100)
     """
+    queryset = ReturnRequest.objects.select_related('order').all()
 
-    serializer = CheckEligibilitySerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(
-            {'error': 'Validation failed', 'details': serializer.errors},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    # Apply filters
+    customer_id = request.query_params.get('customer_id')
+    status_filter = request.query_params.get('status')
+    is_flagged = request.query_params.get('is_flagged')
 
-    order = Order.objects.get(id=serializer.validated_data['order_id'])
-    eligibility = _check_eligibility(order)
+    if customer_id:
+        queryset = queryset.filter(customer_id=customer_id)
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    if is_flagged is not None:
+        queryset = queryset.filter(is_flagged=is_flagged.lower() == 'true')
 
-    return Response(eligibility)
+    # Cursor-based pagination
+    page_size = min(int(request.query_params.get('page_size', 20)), 100)
+    cursor = request.query_params.get('cursor')
+    direction = request.query_params.get('direction', 'next')
 
+    if cursor:
+        try:
+            cursor_id = int(cursor)
+            if direction == 'next':
+                queryset = queryset.filter(id__gt=cursor_id)
+            else:
+                queryset = queryset.filter(id__lt=cursor_id).order_by('-id')
+        except ValueError:
+            return Response(
+                {'error': 'Invalid cursor value'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+    # Order by ID for consistent pagination
+    if direction != 'prev':
+        queryset = queryset.order_by('id')
+
+    results = list(queryset[:page_size + 1])  # Fetch one extra to check if more exist
+
+    has_more = len(results) > page_size
+    results = results[:page_size]
+
+    # If prev direction, reverse to maintain correct order
+    if direction == 'prev':
+        results.reverse()
+
+    serializer = ReturnRequestListSerializer(results, many=True)
+
+    response_data = {
+        'results': serializer.data,
+        'page_size': page_size,
+        'has_more': has_more,
+    }
+
+    # Include cursors for next/prev navigation
+    if results:
+        response_data['next_cursor'] = results[-1].id
+        response_data['prev_cursor'] = results[0].id
+
+    return Response(response_data)
+  
 # ============================================================
 # PRIVATE HELPER FUNCTIONS
 # ============================================================
