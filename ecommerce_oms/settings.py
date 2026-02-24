@@ -133,27 +133,25 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # ============================================================
 
 REST_FRAMEWORK = {
-    # Default pagination for all list APIs
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 
-    # Default throttle rates (rate limiting)
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'user': '100/hour',                 # General API rate limit
-        'return_create': '10/hour',         # Limit return creation (fraud prevention)
+        'user': '100/hour',
+        'return_create': '10/hour',
     },
 
-    # Default renderer - JSON responses
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 
-    # Date/time format
     'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 
@@ -260,4 +258,10 @@ RETURN_POLICY = {
     'HIGH_VALUE_THRESHOLD': 10000,              # Rs.10,000 - flag for manual review
 }
 
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'E-Commerce Returns API',
+    'DESCRIPTION': 'API for managing customer returns, eligibility checks, webhook integrations, and fraud detection.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
